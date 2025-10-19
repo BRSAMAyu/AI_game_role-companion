@@ -19,9 +19,75 @@ body {
   background: rgba(15, 15, 20, 0.6);
   backdrop-filter: blur(12px);
   opacity: 0;
-  transition: opacity 150ms ease-in-out;
+  transition: opacity 150ms ease-in-out, transform 150ms ease-out;
+  will-change: opacity, transform;
+  text-align: center;
 }
 
 #overlay-text.visible {
   opacity: 1;
+}
+
+#overlay-text.subtitle-default {
+  font-size: 22px;
+  font-weight: 600;
+  text-shadow:
+    0 0 4px rgba(0, 0, 0, 0.8),
+    0 0 10px rgba(0, 0, 0, 0.6),
+    0 0 18px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.5px;
+}
+
+#overlay-text.subtitle-battle {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-shadow:
+    0 0 6px rgba(255, 100, 100, 0.8),
+    0 0 14px rgba(255, 60, 60, 0.6),
+    0 0 24px rgba(0, 0, 0, 0.8);
+}
+
+#overlay-text.visible.subtitle-default {
+  transform: translateY(0);
+}
+
+#overlay-text.subtitle-default {
+  transform: translateY(6px);
+}
+
+#overlay-text.subtitle-battle {
+  transform: scale(0.94);
+}
+
+#overlay-text.visible.subtitle-battle {
+  animation:
+    subtitle-battle-pop 160ms ease-out forwards,
+    subtitle-battle-shake 320ms ease-in-out 1 160ms;
+}
+
+@keyframes subtitle-battle-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes subtitle-battle-shake {
+  0% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-3px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+  100% {
+    transform: translateX(0);
+  }
 }
