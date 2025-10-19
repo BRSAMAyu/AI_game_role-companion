@@ -204,7 +204,8 @@ class CompanionRuntime:
         self._recent.add(text)
 
         style, tts_mode = self._scene_modes(scene)
-        if not self._cooldown.allow(tts_mode, self._tone_cooldowns.get(tts_mode, 3.0)):
+        cooldown_key = f"tts:{tts_mode}" if tts_mode else "tts:default"
+        if not self._cooldown.allow(cooldown_key, self._tone_cooldowns.get(tts_mode, 3.0)):
             logger.debug("Tone on cooldown", tone=tts_mode)
             return
 
