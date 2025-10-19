@@ -103,12 +103,12 @@ class OCRReader:
         processed_frame, scale = self._prepare_frame(np_frame)
 
         try:
-            outputs: Iterable = self._engine(processed_frame)
+            outputs_raw, _elapsed = self._engine(processed_frame)
         except Exception as exc:  # pragma: no cover - defensive against backend failures
             logger.exception("RapidOCR inference failed: {error}", error=str(exc))
             return []
 
-        detections = self._parse_outputs(outputs, scale)
+        detections = self._parse_outputs(outputs_raw, scale)
         if not detections:
             return []
 
