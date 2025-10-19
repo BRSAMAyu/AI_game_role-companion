@@ -36,6 +36,7 @@ class OCRResult:
 
     text: str
     confidence: float
+    bbox: Tuple[float, ...] | None = None
 
 
 class OCRReader:
@@ -121,7 +122,14 @@ class OCRReader:
         """Compatibility wrapper returning :class:`OCRResult` instances."""
 
         detections = self.detect(image, merge_lines=False)
-        results = [OCRResult(text=item["text"], confidence=float(item["score"])) for item in detections]
+        results = [
+            OCRResult(
+                text=item["text"],
+                confidence=float(item["score"]),
+                bbox=tuple(float(v) for v in item.get("bbox", [])) if item.get("bbox") else None,
+            )
+            for item in detections
+        ]
         logger.trace("OCR produced {count} fragments", count=len(results))
         return results
 

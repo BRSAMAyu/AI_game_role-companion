@@ -113,5 +113,3 @@ class TextToSpeech:
     # def speak_with_edge(self, text: str, voice: str = "zh-CN-XiaoxiaoNeural") -> Awaitable[None]:
     #     """Example signature for adopting edge-tts async playback."""
     #     raise NotImplementedError
-
-*** End of File
