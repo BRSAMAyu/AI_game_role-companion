@@ -90,15 +90,27 @@ class OverlayClient:
 class CompanionRuntime:
     """High-level runtime tying capture, classification and responses together."""
 
-    def __init__(self, settings: CompanionSettings) -> None:
+    def __init__(
+        self,
+        settings: CompanionSettings,
+        *,
+        watcher: ScreenWatcher | None = None,
+        classifier: SceneClassifier | None = None,
+        orchestrator: DialogueOrchestrator | None = None,
+        tts: TextToSpeech | None = None,
+        overlay: OverlayClient | None = None,
+        ocr_reader: OCRReader | None = None,
+        cooldown: Cooldown | None = None,
+        recent_buffer: RecentBuffer | None = None,
+    ) -> None:
         self._settings = settings
-        self._watcher = ScreenWatcher()
-        self._classifier = SceneClassifier()
-        self._orchestrator = DialogueOrchestrator()
-        self._tts = TextToSpeech(settings.tts_voice)
-        self._overlay = OverlayClient(settings.websocket_url, settings.overlay_display_ms)
-        self._cooldown = Cooldown()
-        self._recent = RecentBuffer(window_seconds=30.0)
+        self._watcher = watcher or ScreenWatcher()
+        self._classifier = classifier or SceneClassifier()
+        self._orchestrator = orchestrator or DialogueOrchestrator()
+        self._tts = tts or TextToSpeech(settings.tts_voice)
+        self._overlay = overlay or OverlayClient(settings.websocket_url, settings.overlay_display_ms)
+        self._cooldown = cooldown or Cooldown()
+        self._recent = recent_buffer or RecentBuffer(window_seconds=30.0)
         self._active = True
         self._silence_until = 0.0
         self._silence_logged = False
@@ -118,11 +130,21 @@ class CompanionRuntime:
             "default": 3.0,
         }
 
-        try:
-            self._ocr = OCRReader()
-        except RuntimeError as exc:
-            logger.warning("OCR disabled: {error}", error=str(exc))
-            self._ocr = None
+        if ocr_reader is not None:
+            self._ocr = ocr_reader
+        else:
+            try:
+                self._ocr = OCRReader()
+            except RuntimeError as exc:
+                logger.warning("OCR disabled: {error}", error=str(exc))
+                self._ocr = None
+
+        if hasattr(self._watcher, "start"):
+            try:
+                self._watcher.start()  # type: ignore[call-arg]
+            except Exception as exc:  # pragma: no cover - defensive start
+                logger.warning("Failed to start ScreenWatcher automatically", error=str(exc))
+        self._supports_motion = hasattr(self._watcher, "get_motion_score")
 
     # ------------------------------------------------------------------
     # Hotkey integration
@@ -158,8 +180,22 @@ class CompanionRuntime:
 
     def shutdown(self) -> None:
         self._overlay.close()
+        if hasattr(self._watcher, "stop"):
+            with contextlib.suppress(Exception):
+                self._watcher.stop()  # type: ignore[call-arg]
         with contextlib.suppress(Exception):
             self._tts._executor.shutdown(wait=False)
+
+    def run_once(self) -> None:
+        """Execute a single pipeline iteration (primarily for testing)."""
+
+        self._tick()
+
+    def run_steps(self, steps: int) -> None:
+        """Execute ``steps`` pipeline iterations synchronously."""
+
+        for _ in range(int(max(0, steps))):
+            self._tick()
 
     # ------------------------------------------------------------------
     def _tick(self) -> None:
@@ -168,7 +204,13 @@ class CompanionRuntime:
             return
 
         ocr_lines = self._run_ocr(frame)
-        motion_score = self._compute_motion(frame)
+        if self._supports_motion:
+            try:
+                motion_score = float(self._watcher.get_motion_score())  # type: ignore[attr-defined]
+            except Exception:
+                motion_score = self._compute_motion(frame)
+        else:
+            motion_score = self._compute_motion(frame)
         label, confidence = self._classifier.classify(frame, ocr_lines, motion_score)
         scene = self._apply_confidence_gate(label, confidence)
         features = self._collect_features(frame, ocr_lines, motion_score)
@@ -218,9 +260,29 @@ class CompanionRuntime:
     # ------------------------------------------------------------------
     # Helpers
     def _capture_frame(self) -> Optional[np.ndarray]:
+        timeout = min(2.0, max(0.25, self._settings.screenshot_interval_ms / 1000.0 * 3.0))
+        getter = getattr(self._watcher, "get_latest", None)
+        if getter is None:
+            logger.error("Screen watcher missing get_latest")
+            return None
+
         try:
-            return self._watcher.get_latest()
+            return getter(timeout=timeout)  # type: ignore[misc]
+        except TypeError:
+            # Watcher does not support timeout kwarg; retry without it.
+            pass
+        except RuntimeError as exc:
+            logger.warning("Screen capture timeout", timeout=timeout, error=str(exc))
+            return None
         except Exception as exc:
+            logger.error("Screen capture failed", error=str(exc))
+            return None
+
+        try:
+            return getter()  # type: ignore[call-arg]
+        except RuntimeError as exc:
+            logger.warning("Screen capture unavailable", error=str(exc))
+        except Exception as exc:  # pragma: no cover - defensive guard
             logger.error("Screen capture failed", error=str(exc))
         return None
 

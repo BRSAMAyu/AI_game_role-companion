@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+import re
 import time
 from typing import Any, Callable, Dict, Iterable, List, MutableMapping, Optional, Sequence
 
@@ -141,6 +142,7 @@ class DialogueOrchestrator:
             "en": ["continue", "dialog"],
             "ja": ["続け", "対話"],
         }
+        self._coord_pattern = re.compile(r"\[y\s*=\s*[^\]]+\]")
 
     # ------------------------------------------------------------------
     # LLM fallback placeholder
@@ -361,7 +363,8 @@ class DialogueOrchestrator:
         return "zh"
 
     def _build_dialog_summary(self, lines: Sequence[str], lang: str) -> str:
-        focus = lines[-1].strip()
+        raw = lines[-1]
+        focus = self._coord_pattern.sub("", raw).strip()
         if len(focus) > 18:
             focus = focus[:18] + "…"
         return focus
@@ -419,7 +422,13 @@ class DialogueOrchestrator:
 
     def _silence(self, scene: str, lang: str, reason: str) -> Decision:
         logger.debug("Silence decision", scene=scene, language=lang, reason=reason)
-        return Decision(action="silence", text=None, tone="neutral", language=lang, metadata={"scene": scene, "reason": reason})
+        return Decision(
+            action="silence",
+            text=None,
+            tone="silence",
+            language=lang,
+            metadata={"scene": scene, "reason": reason},
+        )
 
 
 # Backward-compatible orchestrator for other subsystems -----------------------
