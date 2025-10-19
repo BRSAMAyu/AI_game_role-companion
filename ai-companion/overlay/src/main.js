@@ -47,6 +47,7 @@ function startWebSocketServer() {
           mainWindow?.webContents.send('show-text', {
             text: payload.text || '',
             ms: payload.ms || 4000,
+            style: payload.style || 'default',
           });
         }
       } catch (error) {
