@@ -35,3 +35,9 @@ class ScreenWatcher:
         image = np.array(raw)[:, :, :3]
         logger.trace("Captured frame size {shape}", shape=image.shape)
         return ScreenCapture(image=image, monitor=monitor)
+
+    def get_latest(self) -> np.ndarray:
+        """Capture and return the most recent screen image."""
+
+        capture = self.grab()
+        return capture.image
