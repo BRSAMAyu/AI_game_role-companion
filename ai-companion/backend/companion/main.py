@@ -260,9 +260,29 @@ class CompanionRuntime:
     # ------------------------------------------------------------------
     # Helpers
     def _capture_frame(self) -> Optional[np.ndarray]:
+        timeout = min(2.0, max(0.25, self._settings.screenshot_interval_ms / 1000.0 * 3.0))
+        getter = getattr(self._watcher, "get_latest", None)
+        if getter is None:
+            logger.error("Screen watcher missing get_latest")
+            return None
+
         try:
-            return self._watcher.get_latest()
+            return getter(timeout=timeout)  # type: ignore[misc]
+        except TypeError:
+            # Watcher does not support timeout kwarg; retry without it.
+            pass
+        except RuntimeError as exc:
+            logger.warning("Screen capture timeout", timeout=timeout, error=str(exc))
+            return None
         except Exception as exc:
+            logger.error("Screen capture failed", error=str(exc))
+            return None
+
+        try:
+            return getter()  # type: ignore[call-arg]
+        except RuntimeError as exc:
+            logger.warning("Screen capture unavailable", error=str(exc))
+        except Exception as exc:  # pragma: no cover - defensive guard
             logger.error("Screen capture failed", error=str(exc))
         return None
 
